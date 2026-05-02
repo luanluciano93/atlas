@@ -6,19 +6,22 @@
 
 #include "enums.h"
 
+#include <functional>
+#include <optional>
+
 class WildcardTreeNode
 {
 public:
-	explicit WildcardTreeNode(bool breakpoint) : breakpoint(breakpoint) {}
+	explicit WildcardTreeNode(bool breakpoint) : breakpoint{breakpoint} {}
 	WildcardTreeNode(WildcardTreeNode&& other) = default;
 
 	// non-copyable
 	WildcardTreeNode(const WildcardTreeNode&) = delete;
 	WildcardTreeNode& operator=(const WildcardTreeNode&) = delete;
 
-	WildcardTreeNode* getChild(char ch);
-	const WildcardTreeNode* getChild(char ch) const;
-	WildcardTreeNode* addChild(char ch, bool breakpoint);
+	[[nodiscard]] std::optional<std::reference_wrapper<WildcardTreeNode>> getChild(char ch);
+	[[nodiscard]] std::optional<std::reference_wrapper<const WildcardTreeNode>> getChild(char ch) const;
+	WildcardTreeNode& addChild(char ch, bool breakpoint);
 
 	void insert(const std::string& str);
 	void remove(const std::string& str);

@@ -6,39 +6,36 @@
 #include "wildcardtree.h"
 
 #include <stack>
-#include <tuple>
 
-WildcardTreeNode* WildcardTreeNode::getChild(char ch)
+std::optional<std::reference_wrapper<WildcardTreeNode>> WildcardTreeNode::getChild(char ch)
 {
 	auto it = children.find(ch);
 	if (it == children.end()) {
-		return nullptr;
+		return std::nullopt;
 	}
-	return &it->second;
+	return it->second;
 }
 
-const WildcardTreeNode* WildcardTreeNode::getChild(char ch) const
+std::optional<std::reference_wrapper<const WildcardTreeNode>> WildcardTreeNode::getChild(char ch) const
 {
 	auto it = children.find(ch);
 	if (it == children.end()) {
-		return nullptr;
+		return std::nullopt;
 	}
-	return &it->second;
+	return it->second;
 }
 
-WildcardTreeNode* WildcardTreeNode::addChild(char ch, bool breakpoint)
+WildcardTreeNode& WildcardTreeNode::addChild(char ch, bool breakpoint)
 {
-	WildcardTreeNode* child = getChild(ch);
-	if (child) {
-		if (breakpoint && !child->breakpoint) {
-			child->breakpoint = true;
+	if (auto node = getChild(ch)) {
+		if (breakpoint && !node->get().breakpoint) {
+			node->get().breakpoint = true;
 		}
-	} else {
-		auto pair =
-		    children.emplace(std::piecewise_construct, std::forward_as_tuple(ch), std::forward_as_tuple(breakpoint));
-		child = &pair.first->second;
+		return *node;
 	}
-	return child;
+
+	auto [it, _] = children.try_emplace(ch, breakpoint);
+	return it->second;
 }
 
 void WildcardTreeNode::insert(const std::string& str)
@@ -47,7 +44,7 @@ void WildcardTreeNode::insert(const std::string& str)
 
 	size_t length = str.length() - 1;
 	for (size_t pos = 0; pos < length; ++pos) {
-		cur = cur->addChild(str[pos], false);
+		cur = &cur->addChild(str[pos], false);
 	}
 
 	cur->addChild(str[length], true);
@@ -55,21 +52,22 @@ void WildcardTreeNode::insert(const std::string& str)
 
 void WildcardTreeNode::remove(const std::string& str)
 {
-	WildcardTreeNode* cur = this;
+	auto cur = this;
 
 	std::stack<WildcardTreeNode*> path;
 	path.push(cur);
-	size_t len = str.length();
-	for (size_t pos = 0; pos < len; ++pos) {
-		cur = cur->getChild(str[pos]);
-		if (!cur) {
+	for (const auto& ch : str) {
+		auto node = cur->getChild(ch);
+		if (!node) {
 			return;
 		}
+		cur = &node->get();
 		path.push(cur);
 	}
 
 	cur->breakpoint = false;
 
+	size_t len = str.size();
 	do {
 		cur = path.top();
 		path.pop();
@@ -91,10 +89,11 @@ ReturnValue WildcardTreeNode::findOne(const std::string& query, std::string& res
 {
 	const WildcardTreeNode* cur = this;
 	for (char pos : query) {
-		cur = cur->getChild(pos);
-		if (!cur) {
+		auto node = cur->getChild(pos);
+		if (!node) {
 			return RETURNVALUE_PLAYERWITHTHISNAMEISNOTONLINE;
 		}
+		cur = &node->get();
 	}
 
 	result = query;
@@ -107,8 +106,8 @@ ReturnValue WildcardTreeNode::findOne(const std::string& query, std::string& res
 			return RETURNVALUE_NAMEISTOOAMBIGUOUS;
 		}
 
-		auto it = cur->children.begin();
-		result += it->first;
-		cur = &it->second;
+		const auto& [ch, node] = *cur->children.begin();
+		result += ch;
+		cur = &node;
 	} while (true);
 }
